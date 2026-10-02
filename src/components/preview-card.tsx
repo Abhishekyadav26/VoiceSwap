@@ -20,6 +20,7 @@ export interface PreviewData {
   simulation: { pass: boolean; error: string | null; logs: string[] };
   blocked: boolean;
   blockReasons: string[];
+  swapTransaction: string | null;
 }
 
 export function PreviewCard({

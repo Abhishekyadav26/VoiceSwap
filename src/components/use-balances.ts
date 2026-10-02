@@ -21,13 +21,16 @@ export function useBalances() {
   const { publicKey } = useWallet();
   const [balances, setBalances] = useState<WalletBalance[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!publicKey) {
       setBalances([]);
+      setError(null);
       return;
     }
     setLoading(true);
+    setError(null);
     try {
       const lamports = await connection.getBalance(publicKey);
       const out: WalletBalance[] = [
@@ -62,6 +65,15 @@ export function useBalances() {
       setBalances(out);
     } catch (e) {
       console.error("balance fetch failed", e);
+      const msg = e instanceof Error ? e.message : "Balance fetch failed";
+      // The public mainnet RPC rejects browser traffic (403). Tell the user
+      // exactly what to do instead of leaving an empty balance list.
+      setError(
+        /403|access forbidden/i.test(msg)
+          ? "Balance lookup was rejected by the public Solana RPC (403). Set NEXT_PUBLIC_SOLANA_RPC_URL in .env.local to a dedicated RPC endpoint (e.g. Helius, Alchemy, or QuickNode) and restart the dev server."
+          : `Balance lookup failed: ${msg}`
+      );
+      setBalances([]);
     } finally {
       setLoading(false);
     }
@@ -74,5 +86,5 @@ export function useBalances() {
     void refresh();
   }, [refresh]);
 
-  return { balances, loading, refresh };
+  return { balances, loading, refresh, error };
 }

@@ -136,9 +136,14 @@ export async function POST(req: NextRequest) {
       const fee = await connection.getFeeForMessage(tx.message, "confirmed");
       networkFeeSol = fee.value != null ? fee.value / 1e9 : null;
     } catch (e) {
+      const msg = e instanceof Error ? e.message : "Simulation failed";
       simulation = {
         pass: false,
-        error: e instanceof Error ? e.message : "Simulation failed",
+        // The public mainnet RPC rejects browser/serverless traffic (403) —
+        // point at a dedicated RPC instead of showing a raw JSON-RPC dump.
+        error: /403|access forbidden/i.test(msg)
+          ? "Simulation skipped: the public Solana RPC rejected the request (403). Set NEXT_PUBLIC_SOLANA_RPC_URL to a dedicated RPC endpoint (e.g. Helius, Alchemy, or QuickNode)."
+          : msg,
         logs: [],
       };
     }

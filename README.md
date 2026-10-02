@@ -39,8 +39,8 @@ Open http://localhost:3000, connect Phantom/Solflare, dictate or type a command,
 | Var | Required | Description |
 | --- | --- | --- |
 | `GROQ_API_KEY` | No (falls back to heuristic parser) | Groq API key for intent parsing |
-| `GROQ_MODEL` | No (default `llama-3.3-70b-versatile`) | Groq model used for intent parsing |
-| `NEXT_PUBLIC_SOLANA_RPC_URL` | No (defaults to mainnet-beta) | Solana RPC endpoint |
+| `GROQ_MODEL` | No (default `openai/gpt-oss-120b`) | Groq model used for intent parsing |
+| `NEXT_PUBLIC_SOLANA_RPC_URL` | No (defaults to mainnet-beta, which 403s browser traffic — use a dedicated RPC such as Helius/Alchemy/QuickNode) | Solana RPC endpoint |
 | `NEXT_PUBLIC_MAX_SWAP_AMOUNT` | No (default `1000`) | Max input UI amount per swap |
 
 ## Project layout

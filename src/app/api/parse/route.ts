@@ -90,7 +90,10 @@ export async function POST(req: NextRequest) {
   }
   const { text, balances } = parsed.data;
   const apiKey = process.env.GROQ_API_KEY;
-  const model = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+  // llama-3.3-70b-versatile was shut down by Groq on 2026-08-16; GPT-OSS 120B
+  // is the recommended replacement, 20B as a lighter fallback.
+  const configured = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+  const candidates = [...new Set([configured, "openai/gpt-oss-120b", "openai/gpt-oss-20b"])];
 
   if (!apiKey) {
     // Deterministic fallback so Demo Mode works without a key.
@@ -104,33 +107,50 @@ export async function POST(req: NextRequest) {
       balances.length > 0
         ? balances.map((b) => `${b.symbol}: ${b.uiAmount}`).join(", ")
         : "unknown (wallet not connected)";
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0,
-        max_tokens: 512,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: `Command: "${text}"\nWallet balances: ${balanceCtx}\nReturn JSON only.`,
-          },
-        ],
-      }),
-    });
-    if (!res.ok) {
-      throw new Error(`Groq API error (${res.status}): ${(await res.text()).slice(0, 300)}`);
+    // Walk the candidate models so one retired model ID can never take down
+    // parsing — a 404 / model_not_found just falls through to the next.
+    let raw: string | null = null;
+    let lastErr: unknown = null;
+    for (const model of candidates) {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0,
+          max_tokens: 512,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            {
+              role: "user",
+              content: `Command: "${text}"\nWallet balances: ${balanceCtx}\nReturn JSON only.`,
+            },
+          ],
+        }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as {
+          choices?: Array<{ message?: { content?: string | null } }>;
+        };
+        raw = data.choices?.[0]?.message?.content ?? "";
+        break;
+      }
+      const errText = (await res.text()).slice(0, 300);
+      const retired = /model_not_found|does not exist|decommissioned|deprecated/i.test(errText);
+      if (res.status === 404 || (res.status === 400 && retired)) {
+        console.warn(`Groq model "${model}" unavailable, trying next: ${errText}`);
+        lastErr = new Error(`Groq model "${model}" unavailable: ${errText}`);
+        continue;
+      }
+      throw new Error(`Groq API error (${res.status}): ${errText}`);
     }
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string | null } }>;
-    };
-    const raw = data.choices?.[0]?.message?.content ?? "";
+    if (raw == null) {
+      throw lastErr instanceof Error ? lastErr : new Error("No Groq model available");
+    }
     return NextResponse.json(parseModelJson(raw));
   } catch (err) {
     console.error("Groq parse error, using fallback:", err);

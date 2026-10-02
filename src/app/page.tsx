@@ -68,7 +68,7 @@ function getSpeechRecognition(): (new () => SpeechRecognitionInstance) | null {
 function Terminal() {
   const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();
-  const { balances, loading: balLoading } = useBalances();
+  const { balances, loading: balLoading, error: balError } = useBalances();
 
   const [command, setCommand] = useState("swap half my SOL into USDC if slippage is under 0.5 percent");
   const [listening, setListening] = useState(false);
@@ -83,8 +83,17 @@ function Terminal() {
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [interim, setInterim] = useState("");
+  const [mounted, setMounted] = useState(false);
   const recogRef = useRef<SpeechRecognitionInstance | null>(null);
   const baseCommandRef = useRef("");
+
+  // Gate browser-only wallet UI behind mount so the server prerender and the
+  // first client render match — WalletMultiButton reads window/localStorage
+  // internally and otherwise triggers a hydration mismatch.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
 
   // Stop recognition on unmount so the mic indicator can't get stuck.
   useEffect(() => {
@@ -186,6 +195,7 @@ function Terminal() {
     setError(null);
     setClarify(null);
     setPreview(null);
+    setSwapTxB64(null);
     setResult(null);
     setIntent(null);
     try {
@@ -317,7 +327,7 @@ function Terminal() {
             <Switch checked={demoMode} onCheckedChange={setDemoMode} label="Demo mode" />
             <span className="font-medium">Demo Mode {demoMode ? "ON" : "OFF"}</span>
           </label>
-          <WalletMultiButton />
+          {mounted ? <WalletMultiButton /> : null}
         </div>
       </header>
 
@@ -413,6 +423,8 @@ function Terminal() {
             <CardContent>
               {!publicKey ? (
                 <p className="text-sm text-zinc-500">Connect your wallet to see balances. Balances are sent to the parser so “half” / “all” resolve exactly.</p>
+              ) : balError ? (
+                <p className="rounded-xl bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">{balError}</p>
               ) : balLoading ? (
                 <p className="text-sm text-zinc-500">Loading balances…</p>
               ) : balances.length === 0 ? (
