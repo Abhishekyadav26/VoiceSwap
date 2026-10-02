@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { Mic, ShieldCheck, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/controls";
@@ -34,7 +35,7 @@ export default function HeroSection({
   avatarList: AvatarList[];
 }) {
   return (
-    <section className="relative overflow-hidden">
+    <section className="relative flex min-h-[calc(100svh-3.5rem)] flex-col justify-center overflow-hidden">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 -top-24 mx-auto h-72 max-w-3xl rounded-full bg-emerald-400/20 blur-3xl dark:bg-emerald-500/10"
@@ -51,14 +52,7 @@ export default function HeroSection({
           checks and simulation, then confirm once in your wallet.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          <Button
-            size="lg"
-            onClick={() =>
-              document
-                .querySelector("#terminal")
-                ?.scrollIntoView({ behavior: "smooth" })
-            }
-          >
+          <Button size="lg" nativeButton={false} render={<Link href="/terminal" />}>
             Start swapping
           </Button>
           <Button
@@ -66,7 +60,7 @@ export default function HeroSection({
             variant="outline"
             onClick={() =>
               document
-                .querySelector("#preview")
+                .querySelector("#how")
                 ?.scrollIntoView({ behavior: "smooth" })
             }
           >
@@ -96,7 +90,7 @@ export default function HeroSection({
             Loved by Solana traders
           </span>
         </div>
-        <dl className="mt-10 grid w-full max-w-2xl grid-cols-1 gap-3 text-left sm:grid-cols-3">
+        <dl id="how" className="mt-10 grid w-full max-w-2xl scroll-mt-20 grid-cols-1 gap-3 text-left sm:grid-cols-3">
           {STEPS.map((s) => (
             <div
               key={s.title}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ArrowRightLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,10 +14,6 @@ export interface NavigationSection {
   title: string;
   href: string;
   isActive?: boolean;
-}
-
-function scrollTo(hash: string) {
-  document.querySelector(hash)?.scrollIntoView({ behavior: "smooth" });
 }
 
 export default function Header({
@@ -51,7 +48,8 @@ export default function Header({
           <Button
             size="sm"
             className="hidden md:inline-flex"
-            onClick={() => scrollTo("#terminal")}
+            nativeButton={false}
+            render={<Link href="/terminal" />}
           >
             Open terminal
           </Button>
@@ -78,10 +76,9 @@ export default function Header({
                 <Button
                   size="sm"
                   className="mt-2 w-full"
-                  onClick={() => {
-                    setOpen(false);
-                    scrollTo("#terminal");
-                  }}
+                  nativeButton={false}
+                  render={<Link href="/terminal" />}
+                  onClick={() => setOpen(false)}
                 >
                   Open terminal
                 </Button>

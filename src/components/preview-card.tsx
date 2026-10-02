@@ -8,6 +8,7 @@ import { Globe } from "@/components/ui/globe";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { BorderBeam } from "@/components/ui/border-beam";
 import { BlurFade } from "@/components/ui/blur-fade";
+import { ShimmerButton } from "@/components/ui/shimmer-button";
 import { formatNum } from "@/lib/utils";
 
 export interface PreviewData {
@@ -126,15 +127,28 @@ export function PreviewCard({
           </ul>
         )}
 
-        <Button
-          size="lg"
-          disabled={preview.blocked || confirming}
-          onClick={onConfirm}
-          variant={preview.blocked ? "secondary" : "default"}
-          title={demoMode ? "Demo mode: simulates only" : "Sign and send with wallet"}
-        >
-          {confirming ? "Sending…" : demoMode ? "Confirm (demo — no send)" : "Confirm & swap"}
-        </Button>
+        {preview.blocked ? (
+          <Button
+            size="lg"
+            disabled={preview.blocked || confirming}
+            onClick={onConfirm}
+            variant="secondary"
+            title={demoMode ? "Demo mode: simulates only" : "Sign and send with wallet"}
+          >
+            {confirming ? "Sending…" : demoMode ? "Confirm (demo — no send)" : "Confirm & swap"}
+          </Button>
+        ) : (
+          <ShimmerButton
+            disabled={confirming}
+            onClick={onConfirm}
+            borderRadius="12px"
+            background={demoMode ? "rgba(0, 0, 0, 1)" : "#059669"}
+            className="px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+            title={demoMode ? "Demo mode: simulates only" : "Sign and send with wallet"}
+          >
+            {confirming ? "Sending…" : demoMode ? "Confirm (demo — no send)" : "Confirm & swap"}
+          </ShimmerButton>
+        )}
         {demoMode && (
           <p className="text-xs text-zinc-500">Demo Mode is on: quotes and simulation are real, but nothing is sent. Turn it off to execute for real.</p>
         )}

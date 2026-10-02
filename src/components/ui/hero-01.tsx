@@ -15,9 +15,9 @@ export default function AgencyHeroSection() {
   ];
 
   const navigationData: NavigationSection[] = [
-    { title: "Terminal", href: "#terminal", isActive: true },
-    { title: "Preview", href: "#preview" },
-    { title: "Wallet", href: "#wallet" },
+    { title: "Terminal", href: "/terminal", isActive: true },
+    { title: "Preview", href: "/terminal#preview" },
+    { title: "Wallet", href: "/terminal#wallet" },
   ];
 
   const brandList: BrandList[] = [
