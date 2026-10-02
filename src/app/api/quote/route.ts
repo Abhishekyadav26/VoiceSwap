@@ -7,6 +7,7 @@ import {
   getQuote,
   resolveAmount,
   resolveToken,
+  resolveTokenWithBalance,
 } from "@/lib/jupiter";
 import { checkSafety } from "@/lib/safety";
 import { isDevnet } from "@/lib/network";
@@ -98,9 +99,11 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // 1. Resolve token symbols deterministically against the Jupiter token list.
+  // 1. Resolve token symbols deterministically. The FROM side prefers the
+  // user's wallet balances (exact mint + decimals, works even when the
+  // Jupiter token-list host is unreachable); the TO side uses the list.
   const [inTok, outTok] = await Promise.all([
-    resolveToken(intent.fromToken),
+    resolveTokenWithBalance(intent.fromToken, balances),
     resolveToken(intent.toToken),
   ]);
   if (!inTok) {

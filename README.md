@@ -40,6 +40,7 @@ Open http://localhost:3000, connect Phantom/Solflare, dictate or type a command,
 | --- | --- | --- |
 | `GROQ_API_KEY` | No (falls back to heuristic parser) | Groq API key for intent parsing |
 | `GROQ_MODEL` | No (default `openai/gpt-oss-120b`) | Groq model used for intent parsing |
+| `JUPITER_API_KEY` | No (falls back to keyless lite-api) | Jupiter API key for higher quote/swap rate limits |
 | `NEXT_PUBLIC_SOLANA_NETWORK` | No (default `mainnet-beta`) | `mainnet-beta` for real swaps, `devnet` for safe testing |
 | `NEXT_PUBLIC_SOLANA_RPC_URL` | No (defaults to mainnet-beta, which 403s browser traffic — use a dedicated RPC such as Helius/Alchemy/QuickNode) | Solana RPC endpoint for the network above |
 

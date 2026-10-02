@@ -6,7 +6,7 @@ import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import type { WalletBalance } from "@/lib/intent-schema";
 
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
-const TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS1VTFL9F5AAoyW5ww6Y5p4E";
+const TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 
 const SYMBOL_BY_MINT: Record<string, { symbol: string; decimals: number }> = {
   So11111111111111111111111111111111111111112: { symbol: "SOL", decimals: 9 },

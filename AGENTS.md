@@ -11,7 +11,7 @@ Next.js 16 (App Router) + React 19 + TS + Tailwind v4. Solana swap terminal: voi
 ## Architecture (don't blur these)
 
 - LLM parses intent ONLY (`src/app/api/parse/route.ts` + `src/lib/intent-schema.ts`). It never builds/signs transactions. Ambiguous input must return `{status:"clarify", question}` — never guess.
-- Deterministic flow in `src/app/api/quote/route.ts`: `resolveToken` → `resolveAmount` (from wallet balances) → Jupiter quote → `checkSafety` → build swap tx + `simulateTransaction`. All Jupiter logic lives in `src/lib/jupiter.ts`, blocks in `src/lib/safety.ts` (slippage > user limit, price impact > 2%, amount > `NEXT_PUBLIC_MAX_SWAP_AMOUNT`).
+- Deterministic flow in `src/app/api/quote/route.ts`: `resolveTokenWithBalance` (FROM prefers wallet-balance mints) / `resolveToken` (TO via list) → `resolveAmount` → Jupiter quote → `checkSafety` → build swap tx + `simulateTransaction`. All Jupiter logic lives in `src/lib/jupiter.ts`, blocks in `src/lib/safety.ts` (slippage > user limit, price impact > 2%, amount > `NEXT_PUBLIC_MAX_SWAP_AMOUNT`).
 - Client (`src/app/page.tsx`) only signs/sends via wallet adapter. Demo Mode ON = never send.
 - `SolanaProviders` is mounted once in `src/app/layout.tsx` — do not add another provider in pages.
 - `@/*` maps to `./src/*` (tsconfig). UI primitives in `src/components/ui/` are hand-rolled shadcn-style — there is no shadcn CLI config; add variants there, don't scaffold new systems.
@@ -19,6 +19,6 @@ Next.js 16 (App Router) + React 19 + TS + Tailwind v4. Solana swap terminal: voi
 ## Gotchas
 
 - `src/app/api/quote/route.ts` uses `Buffer` (Node runtime) to deserialize the Jupiter `swapTransaction`; keep API routes on the Node runtime.
-- Jupiter deps: quote/swap via `https://lite-api.jup.ag/swap/v1/*`, token list via `tokens.jup.ag` with a hardcoded well-known-mint fallback in `src/lib/jupiter.ts` — keep that fallback working offline.
+- Jupiter deps: quote/swap via `https://lite-api.jup.ag/swap/v1/*` (or `https://api.jup.ag/swap/v1/*` when server-only `JUPITER_API_KEY` is set), `excludeRouters=jupiterz` on quotes (RFQ routes aren't wallet-completable). `tokens.jup.ag` is DNS-dead — FROM resolution prefers wallet balances, TO falls back to the hardcoded well-known mints in `src/lib/jupiter.ts`; keep that fallback working offline.
 - Tailwind v4 (`@import "tailwindcss"` in `globals.css`); there is no `tailwind.config`.
 - This checkout lives on a Windows-mounted WSL path (`/mnt/c/...` + OneDrive): `npm install` can fail with `ENOTEMPTY … rename … browserslist`. If it does, copy the repo (excluding `node_modules`/`.next`) to a Linux-fs dir (e.g. `/tmp/vs-build`), install/build there, and copy sources back.

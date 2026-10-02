@@ -299,6 +299,9 @@ function Terminal() {
     try {
       const tx = VersionedTransaction.deserialize(base64ToBytes(swapTxB64));
       const sig = await sendTransaction(tx, connection, { skipPreflight: false });
+      // Wait for confirmation before reporting success — otherwise a dropped
+      // transaction would still show "Swap sent".
+      await connection.confirmTransaction(sig, "confirmed");
       setResult({ sig });
       pushHistory({
         id: crypto.randomUUID(),

@@ -3,6 +3,21 @@
  * The LLM never touches this. All amounts / transactions are built here.
  */
 
+import type { WalletBalance } from "@/lib/intent-schema";
+
+// Jupiter hosts: keyless lite (rate-limited) or keyed pro (higher limits).
+// Server-only env — never expose the key with a NEXT_PUBLIC_ prefix.
+function jupBase(): string {
+  return process.env.JUPITER_API_KEY
+    ? "https://api.jup.ag/swap/v1"
+    : "https://lite-api.jup.ag/swap/v1";
+}
+
+function jupHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const key = process.env.JUPITER_API_KEY;
+  return key ? { ...extra, "x-api-key": key } : extra;
+}
+
 export interface TokenInfo {
   address: string;
   symbol: string;
@@ -71,6 +86,18 @@ const WELL_KNOWN: Record<string, TokenInfo> = {
     name: "Pyth Network",
     decimals: 6,
   },
+  MSOL: {
+    address: "mSoLzYCxHdYgdzU16g5QSh3i5ZDLaKfPVsVKgxEV6m2",
+    symbol: "MSOL",
+    name: "Marinade SOL",
+    decimals: 9,
+  },
+  JLP: {
+    address: "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4",
+    symbol: "JLP",
+    name: "Jupiter Liquidity Provider",
+    decimals: 6,
+  },
 };
 
 let tokenCache: Map<string, TokenInfo> | null = null;
@@ -116,6 +143,30 @@ export async function resolveToken(symbol: string): Promise<TokenInfo | null> {
   const map = await loadTokenList();
   const clean = symbol.trim().toUpperCase();
   return map.get(clean) ?? null;
+}
+
+/**
+ * Resolve a symbol preferring the user's own wallet balances (which carry the
+ * exact mint + decimals) over the token list. This keeps FROM-token resolution
+ * working even when the Jupiter token-list host is unreachable, and matches
+ * what the user actually holds. The TO side should still prefer the verified
+ * list via resolveToken().
+ */
+export async function resolveTokenWithBalance(
+  symbol: string,
+  balances: WalletBalance[]
+): Promise<TokenInfo | null> {
+  const clean = symbol.trim().toUpperCase();
+  const bal = balances.find((b) => b.symbol.toUpperCase() === clean);
+  if (bal?.mint && bal.decimals != null) {
+    return {
+      address: bal.mint,
+      symbol: clean,
+      name: bal.symbol,
+      decimals: bal.decimals,
+    };
+  }
+  return resolveToken(symbol);
 }
 
 export function resolveAmount(params: {
@@ -188,9 +239,12 @@ export async function getQuote(params: {
     amount: params.amountBaseUnits,
     slippageBps: String(params.slippageBps),
     restrictIntermediateTokens: "true",
+    // Exclude JupiterZ RFQ routes: they return maker-co-signed transactions
+    // the wallet cannot complete on its own. Verified accepted on lite-api.
+    excludeRouters: "jupiterz",
   });
-  const res = await fetch(`https://lite-api.jup.ag/swap/v1/quote?${qs}`, {
-    headers: { Accept: "application/json" },
+  const res = await fetch(`${jupBase()}/quote?${qs}`, {
+    headers: { Accept: "application/json", ...jupHeaders() },
   });
   if (!res.ok) {
     const text = await res.text();
@@ -199,11 +253,13 @@ export async function getQuote(params: {
   const data = await res.json();
   return {
     inputMint: data.inputMint,
-    inAmount: data.inAmount,
+    inAmount: String(data.inAmount),
     outputMint: data.outputMint,
-    outAmount: data.outAmount,
-    otherAmountThreshold: data.otherAmountThreshold,
-    slippageBps: data.slippageBps,
+    outAmount: String(data.outAmount),
+    otherAmountThreshold: String(data.otherAmountThreshold ?? ""),
+    // The API echoes slippageBps back as a string — coerce so downstream
+    // numeric comparisons can't silently rely on JS type coercion.
+    slippageBps: Number(data.slippageBps ?? 0),
     priceImpactPct: String(data.priceImpactPct ?? "0"),
     routePlan: data.routePlan ?? [],
     contextSlot: data.contextSlot,
@@ -216,9 +272,9 @@ export async function buildSwapTransaction(params: {
   userPublicKey: string;
   wrapAndUnwrapSol?: boolean;
 }): Promise<string> {
-  const res = await fetch("https://lite-api.jup.ag/swap/v1/swap", {
+  const res = await fetch(`${jupBase()}/swap`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers: { "Content-Type": "application/json", Accept: "application/json", ...jupHeaders() },
     body: JSON.stringify({
       quoteResponse: params.quoteResponse,
       userPublicKey: params.userPublicKey,
