@@ -1,12 +1,12 @@
 # AGENTS.md — VoiceSwap
 
-Next.js 16 (App Router) + React 19 + TS + Tailwind v4. Solana swap terminal: voice command → Claude intent parse → Jupiter quote → safety/simulate → wallet confirm.
+Next.js 16 (App Router) + React 19 + TS + Tailwind v4. Solana swap terminal: voice command → Groq intent parse → Jupiter quote → safety/simulate → wallet confirm.
 
 ## Commands
 
 - `npm run dev` / `npm run build` / `npm start` / `npm run lint` (`eslint`, no test/typecheck scripts — use `npx tsc --noEmit` and `npm run build` to verify).
 - No CI, no pre-commit hooks, no test suite. `npm run build` is the gate.
-- Env: `cp .env.example .env.local`. `ANTHROPIC_API_KEY` is server-only and optional (`/api/parse` falls back to a heuristic parser without it). Only `NEXT_PUBLIC_*` vars reach the client.
+- Env: `cp .env.example .env.local`. `GROQ_API_KEY` is server-only and optional (`/api/parse` falls back to a heuristic parser without it). Only `NEXT_PUBLIC_*` vars reach the client.
 
 ## Architecture (don't blur these)
 

@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   SYSTEM_PROMPT,
   WalletBalanceSchema,
-  parseClaudeJson,
+  parseModelJson,
 } from "@/lib/intent-schema";
 
 const BodySchema = z.object({
@@ -89,7 +89,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request", details: parsed.error.flatten() }, { status: 400 });
   }
   const { text, balances } = parsed.data;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
+  const model = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
   if (!apiKey) {
     // Deterministic fallback so Demo Mode works without a key.
@@ -97,28 +98,42 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { default: Anthropic } = await import("@anthropic-ai/sdk");
-    const client = new Anthropic({ apiKey });
+    // Groq exposes an OpenAI-compatible chat API, so plain fetch is enough —
+    // no extra SDK dependency required.
     const balanceCtx =
       balances.length > 0
         ? balances.map((b) => `${b.symbol}: ${b.uiAmount}`).join(", ")
         : "unknown (wallet not connected)";
-    const msg = await client.messages.create({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 512,
-      system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: "user",
-          content: `Command: "${text}"\nWallet balances: ${balanceCtx}\nReturn JSON only.`,
-        },
-      ],
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0,
+        max_tokens: 512,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: `Command: "${text}"\nWallet balances: ${balanceCtx}\nReturn JSON only.`,
+          },
+        ],
+      }),
     });
-    const textBlock = msg.content.find((b) => b.type === "text");
-    const raw = textBlock && textBlock.type === "text" ? textBlock.text : "";
-    return NextResponse.json(parseClaudeJson(raw));
+    if (!res.ok) {
+      throw new Error(`Groq API error (${res.status}): ${(await res.text()).slice(0, 300)}`);
+    }
+    const data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string | null } }>;
+    };
+    const raw = data.choices?.[0]?.message?.content ?? "";
+    return NextResponse.json(parseModelJson(raw));
   } catch (err) {
-    console.error("Claude parse error, using fallback:", err);
+    console.error("Groq parse error, using fallback:", err);
     return NextResponse.json({ ...fallbackParse(text), fallback: true });
   }
 }

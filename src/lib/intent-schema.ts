@@ -57,7 +57,7 @@ export type ParseResult = z.infer<typeof ParseResultSchema>;
  * Extract the first JSON object from model text and validate it.
  * Returns a clarify result instead of throwing on ambiguity.
  */
-export function parseClaudeJson(raw: string): ParseResult {
+export function parseModelJson(raw: string): ParseResult {
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) {
     return {

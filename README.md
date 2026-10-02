@@ -6,7 +6,7 @@ get a Jupiter quote with safety checks + simulation, then confirm in your wallet
 ## How it works
 
 - **LLM parses intent only.** `POST /api/parse` sends the text + wallet balances to the
-  Claude API and asks for structured JSON only:
+  Groq API and asks for structured JSON only:
   `action, fromToken, toToken, amountType (exact|percent|all), amountValue, maxSlippageBps, conditions`.
   Validated with Zod (`src/lib/intent-schema.ts`). Ambiguous/unsupported → clarification question, never a guess.
 - **Deterministic code does everything else.**
@@ -38,7 +38,8 @@ Open http://localhost:3000, connect Phantom/Solflare, dictate or type a command,
 
 | Var | Required | Description |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | No (falls back to heuristic parser) | Claude API key for intent parsing |
+| `GROQ_API_KEY` | No (falls back to heuristic parser) | Groq API key for intent parsing |
+| `GROQ_MODEL` | No (default `llama-3.3-70b-versatile`) | Groq model used for intent parsing |
 | `NEXT_PUBLIC_SOLANA_RPC_URL` | No (defaults to mainnet-beta) | Solana RPC endpoint |
 | `NEXT_PUBLIC_MAX_SWAP_AMOUNT` | No (default `1000`) | Max input UI amount per swap |
 
@@ -47,11 +48,11 @@ Open http://localhost:3000, connect Phantom/Solflare, dictate or type a command,
 ```
 src/
   app/
-    api/parse/route.ts      # Claude intent parsing + Zod validation
+    api/parse/route.ts      # Groq intent parsing + Zod validation
     api/quote/route.ts      # token resolve → amount → Jupiter quote → safety → simulate
     page.tsx                # main terminal screen
   lib/
-    intent-schema.ts        # Zod intent schema + Claude prompt
+    intent-schema.ts        # Zod intent schema + LLM prompt
     jupiter.ts              # Jupiter token list / quote / swap-tx client
     safety.ts               # deterministic safety checks
     speech.ts               # browser speech summary
