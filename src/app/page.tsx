@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import { VersionedTransaction } from "@solana/web3.js";
+import { VersionedTransaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Mic, MicOff, Loader2, ArrowRightLeft, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,6 +13,7 @@ import { useBalances } from "@/components/use-balances";
 import { PreviewCard, type PreviewData } from "@/components/preview-card";
 import { HistoryList, loadHistory, saveHistory, type HistoryItem } from "@/components/history-list";
 import { EXPLORER_TX, formatNum } from "@/lib/utils";
+import { explorerCluster, getNetwork } from "@/lib/network";
 import { buildPreviewSummary, speak } from "@/lib/speech";
 import type { SwapIntent } from "@/lib/intent-schema";
 
@@ -68,7 +69,7 @@ function getSpeechRecognition(): (new () => SpeechRecognitionInstance) | null {
 function Terminal() {
   const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();
-  const { balances, loading: balLoading, error: balError } = useBalances();
+  const { balances, loading: balLoading, error: balError, refresh } = useBalances();
 
   const [command, setCommand] = useState("swap half my SOL into USDC if slippage is under 0.5 percent");
   const [listening, setListening] = useState(false);
@@ -84,8 +85,10 @@ function Terminal() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [interim, setInterim] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [airdropping, setAirdropping] = useState(false);
   const recogRef = useRef<SpeechRecognitionInstance | null>(null);
   const baseCommandRef = useRef("");
+  const network = getNetwork();
 
   // Gate browser-only wallet UI behind mount so the server prerender and the
   // first client render match — WalletMultiButton reads window/localStorage
@@ -244,6 +247,13 @@ function Terminal() {
 
   const handleSpeak = useCallback(() => {
     if (!preview) return;
+    if (preview.isDevnet) {
+      speak(
+        `Devnet preview. You would pay ${formatNum(preview.payUi)} ${preview.paySymbol} ` +
+          `toward ${preview.receiveSymbol}. No Jupiter quote is available on devnet, so there is no price.`
+      );
+      return;
+    }
     speak(
       buildPreviewSummary({
         fromSymbol: preview.paySymbol,
@@ -305,6 +315,24 @@ function Terminal() {
     }
   }, [preview, demoMode, publicKey, sendTransaction, swapTxB64, connection, command, pushHistory]);
 
+  const handleAirdrop = useCallback(async () => {
+    if (!publicKey) {
+      setError("Connect your wallet first.");
+      return;
+    }
+    setAirdropping(true);
+    setError(null);
+    try {
+      const sig = await connection.requestAirdrop(publicKey, LAMPORTS_PER_SOL);
+      await connection.confirmTransaction(sig, "confirmed");
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Airdrop failed");
+    } finally {
+      setAirdropping(false);
+    }
+  }, [publicKey, connection, refresh]);
+
   const walletShort = useMemo(
     () => (publicKey ? `${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}` : null),
     [publicKey]
@@ -318,7 +346,12 @@ function Terminal() {
             <ArrowRightLeft className="size-5" />
           </span>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">VoiceSwap</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight">VoiceSwap</h1>
+              <Badge variant={network === "devnet" ? "warn" : "muted"}>
+                {network === "devnet" ? "Devnet" : "Mainnet"}
+              </Badge>
+            </div>
             <p className="text-sm text-zinc-500">Voice-driven swap terminal for Solana · Jupiter-powered</p>
           </div>
         </div>
@@ -403,7 +436,7 @@ function Terminal() {
               <CardContent className="pt-5">
                 <p className="text-sm font-semibold text-emerald-700">Swap sent ✓</p>
                 <a
-                  href={EXPLORER_TX(result.sig)}
+                  href={EXPLORER_TX(result.sig, explorerCluster())}
                   target="_blank"
                   rel="noreferrer"
                   className="break-all font-mono text-sm text-blue-600 underline"
@@ -421,6 +454,14 @@ function Terminal() {
               <CardTitle>Wallet {walletShort && <span className="font-mono text-sm">({walletShort})</span>}</CardTitle>
             </CardHeader>
             <CardContent>
+              {network === "devnet" && publicKey && (
+                <div className="mb-3">
+                  <Button variant="outline" size="sm" onClick={handleAirdrop} disabled={airdropping}>
+                    {airdropping ? "Airdropping…" : "Airdrop 1 devnet SOL"}
+                  </Button>
+                  <p className="mt-1 text-xs text-zinc-500">Free devnet SOL for testing — no real funds involved.</p>
+                </div>
+              )}
               {!publicKey ? (
                 <p className="text-sm text-zinc-500">Connect your wallet to see balances. Balances are sent to the parser so “half” / “all” resolve exactly.</p>
               ) : balError ? (

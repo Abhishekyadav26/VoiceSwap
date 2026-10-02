@@ -66,12 +66,18 @@ export function useBalances() {
     } catch (e) {
       console.error("balance fetch failed", e);
       const msg = e instanceof Error ? e.message : "Balance fetch failed";
+      let via = "";
+      try {
+        via = ` (via ${new URL(connection.rpcEndpoint).hostname})`;
+      } catch {
+        /* ignore malformed endpoint */
+      }
       // The public mainnet RPC rejects browser traffic (403). Tell the user
       // exactly what to do instead of leaving an empty balance list.
       setError(
         /403|access forbidden/i.test(msg)
-          ? "Balance lookup was rejected by the public Solana RPC (403). Set NEXT_PUBLIC_SOLANA_RPC_URL in .env.local to a dedicated RPC endpoint (e.g. Helius, Alchemy, or QuickNode) and restart the dev server."
-          : `Balance lookup failed: ${msg}`
+          ? `Balance lookup was rejected by the Solana RPC (403)${via}. Set NEXT_PUBLIC_SOLANA_RPC_URL in .env.local to a dedicated mainnet RPC endpoint (e.g. Helius, Alchemy, or QuickNode) and restart the dev server.`
+          : `Balance lookup failed${via}: ${msg}`
       );
       setBalances([]);
     } finally {

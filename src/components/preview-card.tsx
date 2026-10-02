@@ -21,6 +21,7 @@ export interface PreviewData {
   blocked: boolean;
   blockReasons: string[];
   swapTransaction: string | null;
+  isDevnet: boolean;
 }
 
 export function PreviewCard({
@@ -97,6 +98,7 @@ export function PreviewCard({
             <Badge variant="success"><ShieldCheck className="mr-1 size-3" /> Safety: ok</Badge>
           )}
           {demoMode && <Badge variant="warn">Demo mode — will not send</Badge>}
+          {preview.isDevnet && <Badge variant="warn">Devnet — no Jupiter quote</Badge>}
         </div>
 
         {preview.simulation.error && (

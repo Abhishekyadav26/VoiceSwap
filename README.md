@@ -40,7 +40,22 @@ Open http://localhost:3000, connect Phantom/Solflare, dictate or type a command,
 | --- | --- | --- |
 | `GROQ_API_KEY` | No (falls back to heuristic parser) | Groq API key for intent parsing |
 | `GROQ_MODEL` | No (default `openai/gpt-oss-120b`) | Groq model used for intent parsing |
-| `NEXT_PUBLIC_SOLANA_RPC_URL` | No (defaults to mainnet-beta, which 403s browser traffic — use a dedicated RPC such as Helius/Alchemy/QuickNode) | Solana RPC endpoint |
+| `NEXT_PUBLIC_SOLANA_NETWORK` | No (default `mainnet-beta`) | `mainnet-beta` for real swaps, `devnet` for safe testing |
+| `NEXT_PUBLIC_SOLANA_RPC_URL` | No (defaults to mainnet-beta, which 403s browser traffic — use a dedicated RPC such as Helius/Alchemy/QuickNode) | Solana RPC endpoint for the network above |
+
+## Devnet mode
+
+Set `NEXT_PUBLIC_SOLANA_NETWORK=devnet` and point `NEXT_PUBLIC_SOLANA_RPC_URL`
+at a devnet endpoint (e.g. `https://devnet.helius-rpc.com/?api-key=YOUR_KEY`),
+then restart the dev server. In devnet mode:
+
+- Wallet balances come from devnet; use the **Airdrop 1 devnet SOL** button to fund your wallet.
+- Voice parsing works exactly as on mainnet.
+- Jupiter is mainnet-only, so quotes carry no price and the preview is always
+  blocked with sending disabled — safe end-to-end UX testing with no real funds.
+- Explorer links point at devnet.
+
+Switch back to `mainnet-beta` (with a mainnet RPC) for real Jupiter quotes and swaps.
 | `NEXT_PUBLIC_MAX_SWAP_AMOUNT` | No (default `1000`) | Max input UI amount per swap |
 
 ## Project layout

@@ -9,6 +9,7 @@ import {
   resolveToken,
 } from "@/lib/jupiter";
 import { checkSafety } from "@/lib/safety";
+import { isDevnet } from "@/lib/network";
 
 // Uses Node `Buffer` to deserialize the Jupiter swap transaction —
 // must stay on the Node runtime, not Edge.
@@ -38,6 +39,64 @@ export async function POST(req: NextRequest) {
     );
   }
   const { intent, balances, walletAddress } = parsed.data;
+
+  // Devnet mode: Jupiter is mainnet-only, so there is no quote, no price, and
+  // nothing executable. Still resolve the amount from devnet balances and run
+  // the safety checks so voice parsing can be tested safely end to end.
+  if (isDevnet()) {
+    const fromSym = intent.fromToken.toUpperCase();
+    const toSym = intent.toToken.toUpperCase();
+    const balanceUi =
+      balances.find((b) => b.symbol.toUpperCase() === fromSym)?.uiAmount ?? 0;
+    let uiAmount: number;
+    if (intent.amountType === "all") {
+      uiAmount = balanceUi;
+    } else if (intent.amountType === "percent") {
+      uiAmount = (balanceUi * (intent.amountValue ?? 100)) / 100;
+    } else {
+      uiAmount = intent.amountValue ?? 0;
+    }
+    if (!Number.isFinite(uiAmount) || uiAmount <= 0) {
+      return NextResponse.json({
+        status: "clarify",
+        question: `I couldn't determine an amount — your devnet ${fromSym} balance looks empty. Use the Airdrop button to fund your wallet, then tell me an exact amount?`,
+      });
+    }
+    const userSlippage = intent.maxSlippageBps ?? 50; // default 0.5%
+    const safety = checkSafety({
+      quoteSlippageBps: 0,
+      userMaxSlippageBps: userSlippage,
+      priceImpactPct: 0,
+      inputUiAmount: uiAmount,
+    });
+    return NextResponse.json({
+      status: "ok",
+      preview: {
+        payUi: uiAmount.toString(),
+        paySymbol: fromSym,
+        receiveUi: "—",
+        receiveSymbol: toSym,
+        rate: "—",
+        priceImpactPct: "0",
+        slippageBps: 0,
+        userMaxSlippageBps: userSlippage,
+        route: ["Devnet"],
+        networkFeeSol: null,
+        simulation: {
+          pass: false,
+          error: "Skipped on devnet — there is no Jupiter quote to simulate.",
+          logs: [],
+        },
+        blocked: true,
+        blockReasons: [
+          "Devnet mode: Jupiter quotes are only available on mainnet, so this preview has no price and cannot be executed. Switch NEXT_PUBLIC_SOLANA_NETWORK to mainnet-beta for real swaps.",
+          ...safety.reasons,
+        ],
+        isDevnet: true,
+        swapTransaction: null,
+      },
+    });
+  }
 
   // 1. Resolve token symbols deterministically against the Jupiter token list.
   const [inTok, outTok] = await Promise.all([
@@ -169,6 +228,7 @@ export async function POST(req: NextRequest) {
       simulation,
       blocked: !safety.allowed,
       blockReasons: safety.reasons,
+      isDevnet: false,
       inputMint: resolved.inputMint,
       outputMint: resolved.outputMint,
       inputBaseUnits: resolved.baseUnits,

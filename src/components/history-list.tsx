@@ -1,6 +1,7 @@
 "use client";
 
 import { EXPLORER_TX } from "@/lib/utils";
+import { explorerCluster } from "@/lib/network";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/controls";
 
@@ -51,7 +52,7 @@ export function HistoryList({ items }: { items: HistoryItem[] }) {
                 {h.signature && (
                   <a
                     className="mt-1 inline-block font-mono text-xs text-blue-600 underline"
-                    href={EXPLORER_TX(h.signature)}
+                    href={EXPLORER_TX(h.signature, explorerCluster())}
                     target="_blank"
                     rel="noreferrer"
                   >
