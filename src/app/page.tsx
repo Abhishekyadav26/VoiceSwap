@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import { VersionedTransaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { Mic, MicOff, Loader2, ArrowRightLeft, Volume2 } from "lucide-react";
+import { VersionedTransaction, Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Mic, MicOff, Loader2, ArrowRightLeft, Volume2, Sun, Moon } from "lucide-react";
+import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch, Badge } from "@/components/ui/controls";
@@ -12,11 +13,31 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useBalances } from "@/components/use-balances";
 import { PreviewCard, type PreviewData } from "@/components/preview-card";
 import { HistoryList, loadHistory, saveHistory, type HistoryItem } from "@/components/history-list";
+import AgencyHeroSection from "@/components/ui/hero-01";
+import { AnimatedGradientText } from "@/components/ui/animated-gradient-text";
+import { BlurFade } from "@/components/ui/blur-fade";
 import { EXPLORER_TX, formatNum } from "@/lib/utils";
 import { explorerCluster, getNetwork } from "@/lib/network";
 import { buildPreviewSummary, speak } from "@/lib/speech";
 import type { SwapIntent } from "@/lib/intent-schema";
 
+/** Parse an API response as JSON, with a readable error when the server
+ *  returns an empty/non-JSON body (proxy blip, restart mid-request, …). */
+async function readApiJson(res: Response, route: string): Promise<any> { // eslint-disable-line @typescript-eslint/no-explicit-any -- dynamic API payload, narrowed by callers via `as` casts
+  const text = await res.text();
+  if (!text) {
+    throw new Error(
+      `${route} returned an empty response (status ${res.status}) — the dev server may have restarted mid-request. Try again.`
+    );
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(
+      `${route} returned a non-JSON response (status ${res.status}): ${text.slice(0, 120)}`
+    );
+  }
+}
 /** Decode base64 (browser-safe, no Node Buffer needed on the client). */
 function base64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64);
@@ -69,6 +90,7 @@ function getSpeechRecognition(): (new () => SpeechRecognitionInstance) | null {
 function Terminal() {
   const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();
+  const { resolvedTheme, setTheme } = useTheme();
   const { balances, loading: balLoading, error: balError, refresh } = useBalances();
 
   const [command, setCommand] = useState("swap half my SOL into USDC if slippage is under 0.5 percent");
@@ -207,7 +229,7 @@ function Terminal() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: command, balances }),
       });
-      const pj = await pr.json();
+      const pj = await readApiJson(pr, "/api/parse");
       if (pj.status === "clarify") {
         setClarify(pj.question);
         return;
@@ -227,7 +249,7 @@ function Terminal() {
           walletAddress: publicKey?.toBase58(),
         }),
       });
-      const qj = await qr.json();
+      const qj = await readApiJson(qr, "/api/quote");
       if (qj.status === "clarify") {
         setClarify(qj.question);
         return;
@@ -326,11 +348,35 @@ function Terminal() {
     setAirdropping(true);
     setError(null);
     try {
-      const sig = await connection.requestAirdrop(publicKey, LAMPORTS_PER_SOL);
-      await connection.confirmTransaction(sig, "confirmed");
+      // Primary: the configured RPC. Note the Helius devnet faucet requires a
+      // paid plan, so this fails on free keys — fall back to the public devnet
+      // endpoint, which serves free (rate-limited) airdrops.
+      const candidates = [
+        connection,
+        new Connection("https://api.devnet.solana.com", "confirmed"),
+      ];
+      let sig: string | null = null;
+      let used = connection;
+      for (const conn of candidates) {
+        try {
+          sig = await conn.requestAirdrop(publicKey, LAMPORTS_PER_SOL);
+          used = conn;
+          break;
+        } catch {
+          /* try the next RPC */
+        }
+      }
+      if (!sig) {
+        throw new Error(
+          "every RPC refused the airdrop (the Helius devnet faucet needs a paid plan)"
+        );
+      }
+      await used.confirmTransaction(sig, "confirmed");
       await refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Airdrop failed");
+      setError(
+        `Airdrop failed (${e instanceof Error ? e.message : "unknown error"}). Get free devnet SOL at https://faucet.solana.com instead.`
+      );
     } finally {
       setAirdropping(false);
     }
@@ -342,7 +388,9 @@ function Terminal() {
   );
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-8">
+    <div id="top">
+      <AgencyHeroSection />
+      <main className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="flex size-9 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900">
@@ -350,7 +398,9 @@ function Terminal() {
           </span>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight">VoiceSwap</h1>
+              <h1 className="text-2xl font-bold tracking-tight">
+                <AnimatedGradientText colorFrom="#10b981" colorTo="#8b5cf6">VoiceSwap</AnimatedGradientText>
+              </h1>
               <Badge variant={network === "devnet" ? "warn" : "muted"}>
                 {network === "devnet" ? "Devnet" : "Mainnet"}
               </Badge>
@@ -363,6 +413,16 @@ function Terminal() {
             <Switch checked={demoMode} onCheckedChange={setDemoMode} label="Demo mode" />
             <span className="font-medium">Demo Mode {demoMode ? "ON" : "OFF"}</span>
           </label>
+          {mounted && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+              title={resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {resolvedTheme === "dark" ? <Sun /> : <Moon />}
+            </Button>
+          )}
           {mounted ? <WalletMultiButton /> : null}
         </div>
       </header>
@@ -373,7 +433,7 @@ function Terminal() {
 
       <div className="grid gap-5 md:grid-cols-5">
         <div className="flex flex-col gap-5 md:col-span-3">
-          <Card>
+          <Card id="terminal" className="scroll-mt-20">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Dictate a swap</CardTitle>
@@ -426,6 +486,7 @@ function Terminal() {
             </CardContent>
           </Card>
 
+          <div id="preview" className="scroll-mt-20">
           <PreviewCard
             preview={preview}
             demoMode={demoMode}
@@ -433,8 +494,10 @@ function Terminal() {
             onConfirm={handleConfirm}
             onSpeak={handleSpeak}
           />
+          </div>
 
           {result && (
+            <BlurFade key={result.sig}>
             <Card className="border-emerald-300">
               <CardContent className="pt-5">
                 <p className="text-sm font-semibold text-emerald-700">Swap sent ✓</p>
@@ -448,11 +511,12 @@ function Terminal() {
                 </a>
               </CardContent>
             </Card>
+            </BlurFade>
           )}
         </div>
 
         <div className="flex flex-col gap-5 md:col-span-2">
-          <Card>
+          <Card id="wallet" className="scroll-mt-20">
             <CardHeader>
               <CardTitle>Wallet {walletShort && <span className="font-mono text-sm">({walletShort})</span>}</CardTitle>
             </CardHeader>
@@ -492,7 +556,8 @@ function Terminal() {
       <footer className="text-center text-xs text-zinc-400">
         VoiceSwap · LLM parses intent only — Jupiter + deterministic code build, simulate &amp; send. Demo Mode ON by default.
       </footer>
-    </main>
+      </main>
+    </div>
   );
 }
 

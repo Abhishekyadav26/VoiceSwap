@@ -18,6 +18,20 @@ function jupHeaders(extra: Record<string, string> = {}): Record<string, string> 
   return key ? { ...extra, "x-api-key": key } : extra;
 }
 
+/** Read an upstream JSON body with a clear error when it comes back empty
+ *  or non-JSON (rate-limit blanks, gateway blips). */
+async function readUpstreamJson(res: Response, what: string): Promise<any> { // eslint-disable-line @typescript-eslint/no-explicit-any -- upstream JSON shape validated at use sites
+  const text = await res.text();
+  if (!text) {
+    throw new Error(`${what} returned an empty response (status ${res.status})`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`${what} returned a non-JSON response (status ${res.status}): ${text.slice(0, 200)}`);
+  }
+}
+
 export interface TokenInfo {
   address: string;
   symbol: string;
@@ -112,7 +126,7 @@ async function loadTokenList(): Promise<Map<string, TokenInfo>> {
       next: { revalidate: 600 },
     });
     if (res.ok) {
-      const list = (await res.json()) as Array<{
+      const list = (await readUpstreamJson(res, "Jupiter token list")) as Array<{
         address: string;
         symbol: string;
         name: string;
@@ -250,7 +264,7 @@ export async function getQuote(params: {
     const text = await res.text();
     throw new Error(`Jupiter quote failed (${res.status}): ${text.slice(0, 300)}`);
   }
-  const data = await res.json();
+  const data = await readUpstreamJson(res, "Jupiter quote");
   return {
     inputMint: data.inputMint,
     inAmount: String(data.inAmount),
@@ -287,7 +301,7 @@ export async function buildSwapTransaction(params: {
     const text = await res.text();
     throw new Error(`Jupiter swap build failed (${res.status}): ${text.slice(0, 300)}`);
   }
-  const data = await res.json();
+  const data = await readUpstreamJson(res, "Jupiter swap build");
   if (!data.swapTransaction) throw new Error("Jupiter returned no swapTransaction");
   return data.swapTransaction as string;
 }

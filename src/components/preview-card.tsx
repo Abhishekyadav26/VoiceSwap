@@ -4,6 +4,10 @@ import { Volume2, ShieldAlert, ShieldCheck, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/controls";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Globe } from "@/components/ui/globe";
+import { NumberTicker } from "@/components/ui/number-ticker";
+import { BorderBeam } from "@/components/ui/border-beam";
+import { BlurFade } from "@/components/ui/blur-fade";
 import { formatNum } from "@/lib/utils";
 
 export interface PreviewData {
@@ -44,15 +48,23 @@ export function PreviewCard({
           <CardTitle>Preview</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-zinc-500">
-            Dictate a command and hit Parse — a swap preview with quote, safety checks and simulation will appear here.
-          </p>
+          <div className="relative h-72 overflow-hidden rounded-xl bg-zinc-950">
+            <Globe />
+            <p className="pointer-events-none absolute inset-x-0 bottom-3 px-4 text-center text-sm text-zinc-400">
+              Dictate a command and hit Parse — a swap preview with quote, safety checks and simulation will appear here.
+            </p>
+          </div>
         </CardContent>
       </Card>
     );
   }
+  const beam = preview.blocked
+    ? { colorFrom: "#f87171", colorTo: "#ef4444" }
+    : { colorFrom: "#10b981", colorTo: "#34d399" };
   return (
-    <Card className={preview.blocked ? "border-red-300" : "border-emerald-300"}>
+    <BlurFade key={`${preview.paySymbol}-${preview.payUi}-${preview.receiveSymbol}-${preview.receiveUi}`}>
+    <Card className={`relative overflow-hidden ${preview.blocked ? "border-red-300" : "border-emerald-300"}`}>
+      <BorderBeam size={80} duration={8} {...beam} />
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Swap preview</CardTitle>
@@ -65,11 +77,11 @@ export function PreviewCard({
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-900">
             <div className="text-xs text-zinc-500">You pay</div>
-            <div className="text-lg font-semibold">{formatNum(preview.payUi)} {preview.paySymbol}</div>
+            <div className="text-lg font-semibold"><TickedAmount value={preview.payUi} /> {preview.paySymbol}</div>
           </div>
           <div className="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-900">
             <div className="text-xs text-zinc-500">You receive (est.)</div>
-            <div className="text-lg font-semibold">{formatNum(preview.receiveUi)} {preview.receiveSymbol}</div>
+            <div className="text-lg font-semibold"><TickedAmount value={preview.receiveUi} /> {preview.receiveSymbol}</div>
           </div>
         </div>
 
@@ -128,5 +140,13 @@ export function PreviewCard({
         )}
       </CardContent>
     </Card>
+    </BlurFade>
   );
+}
+
+function TickedAmount({ value }: { value: string }) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return <>{formatNum(value)}</>;
+  const dp = Math.min(6, value.split(".")[1]?.length ?? 0);
+  return <NumberTicker value={n} decimalPlaces={dp} />;
 }
